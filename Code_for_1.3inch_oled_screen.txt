@@ -1,0 +1,66 @@
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h> // Modern library for 1.3" OLEDs
+#include <FluxGarage_RoboEyes.h>
+
+#define i2c_Address 0x3c // Typically 0x3C for 1.3" OLEDs
+#define SCREEN_WIDTH 128 
+#define SCREEN_HEIGHT 64 
+#define OLED_RESET -1    
+
+// Initialize for SH1106 (1.3 inch)
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+RoboEyes<Adafruit_SH1106G> roboEyes(display); 
+
+// --- Touch Sensor Logic Setup (UNTOCUHED) ---
+const int touchPin = 1;     // Touch sensor connected to Pin 1
+int moodCounter = 0;        // To track which mood we are on
+bool lastTouchState = LOW;  // To detect the "tap" (edge detection)
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(touchPin, INPUT); // Initialize the touch sensor pin
+
+  // Custom I2C pins for ESP32-C3
+  Wire.begin(20, 21); 
+
+  delay(250); 
+  
+  // SH110X specific initialization sequence
+  display.begin(i2c_Address, true); 
+  display.clearDisplay();
+  display.display();
+
+  // Startup robo eyes
+  roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 100); 
+
+  // Automated eyes behaviour (UNTOCUHED)
+  roboEyes.setAutoblinker(ON, 3, 2); 
+  roboEyes.setIdleMode(ON, 2, 2); 
+}
+
+void loop() {
+  // Check touch sensor state
+  bool currentTouchState = digitalRead(touchPin);
+
+  // LOGIC KEPT EXACTLY AS PROVIDED
+  if (currentTouchState == HIGH && lastTouchState == LOW) {
+    moodCounter++; // Move to next mood
+    if (moodCounter > 3) moodCounter = 0; // Reset back to first mood
+
+    // Reset position to center whenever mood changes
+    roboEyes.setPosition(DEFAULT);
+
+    // Apply the mood based on the counter
+    if (moodCounter == 0) roboEyes.setMood(DEFAULT);
+    else if (moodCounter == 1) roboEyes.setMood(TIRED);
+    else if (moodCounter == 2) roboEyes.setMood(ANGRY);
+    else if (moodCounter == 3) roboEyes.setMood(HAPPY);
+    
+    delay(50); // Small debounce delay
+  }
+  lastTouchState = currentTouchState;
+
+  roboEyes.update(); // update eyes drawings
+}
